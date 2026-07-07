@@ -20,9 +20,6 @@ dependencies = [
   "pydantic>=2",
 ]
 
-[project.entry-points."imbi.plugins"]
-sonarqube = "imbi_plugin_sonarqube.plugin:SonarqubePlugin"
-
 [dependency-groups]
 dev = [
   "coverage[toml]",
