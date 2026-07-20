@@ -36,10 +36,14 @@ from imbi_plugin_sonarqube import client
 
 LOGGER = logging.getLogger(__name__)
 
-#: The single remediation offered: search SonarQube for the component and,
-#: if absent, create it, then write the EXISTS_IN edge + dashboard link.
-#: The same id also reconciles a drifted edge against a live component.
+#: The destructive remediation: search SonarQube for the component and, if
+#: absent, create it, then write the EXISTS_IN edge + dashboard link.
 _REPAIR_EDGE = 'repair-edge'
+
+#: The non-destructive remediation: reconcile a drifted edge / link against a
+#: component analyze() already found. It must never create — if the component
+#: has since vanished, it fails rather than silently creating one.
+_RECONCILE_EDGE = 'reconcile-edge'
 
 #: SonarQube's dashboard link uses the integration slug as its key (unlike
 #: GitHub's bespoke ``github-repository`` key).
@@ -76,7 +80,7 @@ def _create_offer() -> RemediationOffer:
 
 def _reconcile_offer() -> RemediationOffer:
     return RemediationOffer(
-        id=_REPAIR_EDGE,
+        id=_RECONCILE_EDGE,
         label='Repair the SonarQube project link',
     )
 
@@ -302,13 +306,18 @@ class SonarQubeDoctor(AnalysisCapability):
     ) -> RemediationResult:
         """Search for the component, create it if missing, and link it.
 
+        Only the destructive ``_REPAIR_EDGE`` offer may create; the
+        non-destructive ``_RECONCILE_EDGE`` offer fails if the component has
+        vanished since ``analyze`` rather than silently creating one.
+
         Idempotent: returns ``noop`` when the edge already matches a live
         component. The component key is the existing edge identifier or the
         ``<team>:<project>`` default, and is written verbatim to
         ``EXISTS_IN.identifier`` so the gateway's webhook match resolves.
         """
-        if remediation_id != _REPAIR_EDGE:
+        if remediation_id not in (_REPAIR_EDGE, _RECONCILE_EDGE):
             return await super().remediate(ctx, credentials, remediation_id)
+        allow_create = remediation_id == _REPAIR_EDGE
         slug = ctx.integration_slug
         if slug is None:
             return RemediationResult(
@@ -344,6 +353,14 @@ class SonarQubeDoctor(AnalysisCapability):
             )
             created = False
             if component is None:
+                if not allow_create:
+                    return RemediationResult(
+                        status='failed',
+                        message=(
+                            f'SonarQube component {key!r} no longer exists; '
+                            're-run the doctor to re-create it.'
+                        ),
+                    )
                 component = await client.create_project(
                     base_url=base_url,
                     api_token=api_token,

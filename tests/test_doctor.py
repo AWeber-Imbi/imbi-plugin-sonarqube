@@ -11,7 +11,11 @@ from imbi_common.plugins.base import (
 )
 from imbi_common.plugins.errors import PluginRemediationNotSupported
 
-from imbi_plugin_sonarqube.doctor import _REPAIR_EDGE, SonarQubeDoctor
+from imbi_plugin_sonarqube.doctor import (
+    _RECONCILE_EDGE,
+    _REPAIR_EDGE,
+    SonarQubeDoctor,
+)
 
 _SLUG = 'sonarqube'
 _URL = 'https://sonarqube.example.com'
@@ -215,6 +219,21 @@ class RemediateTestCase(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(create.called)
         assert ctx.service_writeback is not None
         self.assertEqual(ctx.service_writeback.identifier, _KEY)
+
+    @respx.mock
+    async def test_reconcile_missing_component_fails_without_create(
+        self,
+    ) -> None:
+        search = respx.get(_SEARCH).mock(return_value=_components())
+        create = respx.post(_CREATE)
+        ctx = _ctx(connections=[_conn()], links={_LINK_KEY: _DASHBOARD})
+        result = await SonarQubeDoctor().remediate(
+            ctx, _CREDS, _RECONCILE_EDGE
+        )
+        self.assertEqual(result.status, 'failed')
+        self.assertTrue(search.called)
+        self.assertFalse(create.called)
+        self.assertIsNone(ctx.service_writeback)
 
     @respx.mock
     async def test_client_error_failed(self) -> None:
