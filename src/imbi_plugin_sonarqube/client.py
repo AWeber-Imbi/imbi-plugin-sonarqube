@@ -102,6 +102,13 @@ async def search_project(
     except httpx.RequestError as exc:
         raise SonarqubeClientError(f'SonarQube request failed: {exc}') from exc
     if response.is_error:
+        LOGGER.warning(
+            'SonarQube %s %s returned %d: %s',
+            response.request.method,
+            response.request.url,
+            response.status_code,
+            response.text,
+        )
         raise SonarqubeClientError(
             f'SonarQube returned status {response.status_code}'
         )
@@ -148,6 +155,13 @@ async def create_project(
     except httpx.RequestError as exc:
         raise SonarqubeClientError(f'SonarQube request failed: {exc}') from exc
     if response.is_error:
+        LOGGER.warning(
+            'SonarQube %s %s returned %d: %s',
+            response.request.method,
+            response.request.url,
+            response.status_code,
+            response.text,
+        )
         raise SonarqubeClientError(
             f'SonarQube returned status {response.status_code}'
         )

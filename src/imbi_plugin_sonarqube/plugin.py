@@ -83,7 +83,9 @@ class SonarQubePlugin(plugins.Plugin):
                     'label': 'SonarQube API Token',
                     'description': (
                         'User or analysis token with read access to '
-                        '/api/measures/component.'
+                        '/api/measures/component, plus the Create Projects '
+                        'permission if the Project Doctor should search for '
+                        'and create SonarQube projects.'
                     ),
                 }
             ],
